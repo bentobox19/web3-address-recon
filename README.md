@@ -49,7 +49,7 @@ export SQLITE_DB_FILE=./db/web3-address-recon.sqlite3
 ```bash
 # First time
 uv venv
-uv pip install requirements.txt
+uv pip install -r requirements.txt
 ```
 
 ## Usage
