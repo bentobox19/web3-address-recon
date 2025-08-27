@@ -29,11 +29,43 @@ class AlchemyClient:
 
     @sleep_and_retry
     @limits(calls=300, period=1)
-    def get_native_balance(self, network: str, address: str) -> float:
+    def is_eoa(self, network: str, address: str) -> bool | None:
+        if network not in self.base_urls:
+            logger.debug("Unsupported network: %s", network)
+            return None
+
+        try:
+            url = self.base_urls[network]
+            payload = {
+                "jsonrpc": "2.0",
+                "method": "eth_getCode",
+                "params": [address, "latest"],
+                "id": 1
+            }
+
+            response = requests.post(url, json=payload, timeout=10)
+            response.raise_for_status()
+
+            result = response.json().get("result")
+            if result:
+                return result == '0x'
+
+            return None
+
+        except RequestException as e:
+            logger.error("Network error getting code for address %s on network %s: %s", address, network, e)
+            return None
+        except (ValueError, KeyError) as e:
+            logger.error("API response parsing error for address %s on network %s: %s", address, network, e)
+            return None
+
+    @sleep_and_retry
+    @limits(calls=300, period=1)
+    def get_native_balance(self, network: str, address: str) -> str:
         # Check if the requested network is supported.
         if network not in self.base_urls:
             logger.debug("Unsupported network: %s", network)
-            return 0.0
+            return "0"
 
         # TODO
         # Interact with non-EVM networks
@@ -52,15 +84,13 @@ class AlchemyClient:
             result = response.json().get("result")
             if result:
                 balance_wei = int(result, 16)
-                # The conversion factor for native tokens is consistently 1e18.
-                balance = balance_wei / 1e18
-                return balance
+                return str(balance_wei)
 
-            return 0.0
+            return "0"
 
         except RequestException as e:
             logger.error("Network error getting balance for address %s on network %s: %s", address, network, e)
-            return 0.0
+            return "0"
         except (ValueError, KeyError) as e:
             logger.error("API response parsing error for address %s on network %s: %s", address, network, e)
-            return 0.0
+            return "0"

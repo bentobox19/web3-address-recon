@@ -7,7 +7,8 @@ logger = logging.getLogger(__name__)
 class AddressRecord:
     network: str
     address: str
-    native_balance: str
+    native_balance: str = "0"
+    is_eoa: bool | None = None
 
 class AddressAnalyzer:
     def __init__(self, db_client, alchemy_client):
@@ -27,7 +28,7 @@ class AddressAnalyzer:
             record = (AddressRecord(
                 network=network,
                 address=address,
-                native_balance="0.0"
+                native_balance="0"
             ))
 
             # Retrieve record from the database
@@ -37,8 +38,10 @@ class AddressAnalyzer:
                 logger.debug(f"Found existing record for {address} on {network}.")
                 # Update dataclass instance with data from the database
                 record.native_balance = db_record.get('native_balance', record.native_balance)
+                record.is_eoa = db_record.get('is_eoa', record.is_eoa)
 
-                print(record.native_balance)
+                print(f"Native Balance: {record.native_balance}, EOA: {record.is_eoa}")
+
 
             # Get native balance
             # NOTE: Currently, this check is performed for all addresses regardless of type.
@@ -48,7 +51,11 @@ class AddressAnalyzer:
             logger.debug(f"Native balance - {network}:{address} - {native_balance}.")
 
             # Update the in-memory dictionary with the new data
-            record.native_balance = str(native_balance)
+            record.native_balance = native_balance
+
+            is_eoa = self.alchemy_client.is_eoa(network, address)
+            logger.debug(f"Is EOA - {network}:{address} - {is_eoa}.")
+            record.is_eoa = is_eoa
 
             # Send the updated object to the database
             self.db_client.upsert_address_record(record)

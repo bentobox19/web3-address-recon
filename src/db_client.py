@@ -18,6 +18,7 @@ class DBClient:
                 network TEXT,
                 address TEXT,
                 native_balance TEXT,
+                is_eoa BOOLEAN,
                 PRIMARY KEY (network, address)
             )
         ''')
@@ -42,8 +43,8 @@ class DBClient:
     def upsert_address_record(self, record: dict):
         try:
             self.cursor.execute(
-                "INSERT OR REPLACE INTO addresses (network, address, native_balance) VALUES (?, ?, ?)",
-                (record.network, record.address, record.native_balance)
+                "INSERT OR REPLACE INTO addresses (network, address, native_balance, is_eoa) VALUES (?, ?, ?, ?)",
+                (record.network, record.address, record.native_balance, record.is_eoa)
             )
 
             self.conn.commit()
@@ -51,4 +52,3 @@ class DBClient:
                         record.address, record.network)
         except sqlite3.Error as e:
             logger.error("Error upserting address record: %s", e)
-
