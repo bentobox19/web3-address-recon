@@ -35,26 +35,22 @@ class AddressAnalyzer:
             db_record = self.db_client.get_address_record(network, address)
 
             if db_record:
-                logger.debug(f"Found existing record for {address} on {network}.")
+                logger.debug(f"Found existing record for {address} on {network}")
                 # Update dataclass instance with data from the database
                 record.native_balance = db_record.get('native_balance', record.native_balance)
                 record.is_eoa = db_record.get('is_eoa', record.is_eoa)
 
                 print(f"Native Balance: {record.native_balance}, EOA: {record.is_eoa}")
 
-
             # Get native balance
-            # NOTE: Currently, this check is performed for all addresses regardless of type.
-            # Future implementation may need to add conditional logic to skip this for specific
-            # address types (e.g., smart contracts that do not hold a native balance).
             native_balance = self.alchemy_client.get_native_balance(network, address)
-            logger.debug(f"Native balance - {network}:{address} - {native_balance}.")
+            logger.debug(f"Native balance - {network}:{address} - {native_balance}")
 
             # Update the in-memory dictionary with the new data
             record.native_balance = native_balance
 
             is_eoa = self.alchemy_client.is_eoa(network, address)
-            logger.debug(f"Is EOA - {network}:{address} - {is_eoa}.")
+            logger.debug(f"Is EOA - {network}:{address} - {is_eoa}")
             record.is_eoa = is_eoa
 
             # Send the updated object to the database
