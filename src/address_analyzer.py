@@ -42,6 +42,8 @@ class AddressAnalyzer:
                 except Exception as exc:
                     logger.error(f'{network}:{address} generated an exception: {exc}')
 
+        self.db_client.close()
+
     def _fetch_balance(self, network: str, address: str):
         native_balance = self.rpc_client.get_native_balance(network, address)
         logger.debug(f"Native balance - {network}:{address} - {native_balance}")
