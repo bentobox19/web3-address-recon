@@ -3,7 +3,7 @@ import logging
 from src.config import config
 from src.file_reader import FileReader
 from src.db_client import DBClient
-from src.alchemy_client import AlchemyClient
+from src.rpc_client import RPCClient
 from src.address_analyzer import AddressAnalyzer
 
 def main():
@@ -16,9 +16,9 @@ def main():
 
     # Setup tool modules
     db_client = DBClient()
-    alchemy_client = AlchemyClient()
+    rpc_client = RPCClient()
     file_reader = FileReader()
-    address_analyzer = AddressAnalyzer(db_client, alchemy_client)
+    address_analyzer = AddressAnalyzer(db_client, rpc_client)
 
     # Engage on the main task
     addresses = file_reader.get_addresses()

@@ -1,11 +1,13 @@
 import logging
 import sqlite3
+import threading
 
 from src.config import config
 
 logger = logging.getLogger(__name__)
 
 class DBClient:
+    _lock = threading.Lock()
     def __init__(self):
         logger.info(f"Initializing local DB at {config.SQLITE_DB_FILE}")
 
@@ -41,14 +43,18 @@ class DBClient:
             return None
 
     def upsert_address_record(self, record: dict):
-        try:
-            self.cursor.execute(
-                "INSERT OR REPLACE INTO addresses (network, address, native_balance, is_eoa) VALUES (?, ?, ?, ?)",
-                (record.network, record.address, record.native_balance, record.is_eoa)
-            )
+        with self._lock:
+            try:
+                self.cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO addresses (network, address, native_balance, is_eoa)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (record.network, record.address, record.native_balance, record.is_eoa)
+                )
 
-            self.conn.commit()
-            logger.info("Successfully upserted record for address %s on network %s",
-                        record.address, record.network)
-        except sqlite3.Error as e:
-            logger.error("Error upserting address record: %s", e)
+                self.conn.commit()
+                logger.info("Successfully upserted record for address %s on network %s",
+                            record.address, record.network)
+            except sqlite3.Error as e:
+                logger.error("Error upserting address record: %s", e)
