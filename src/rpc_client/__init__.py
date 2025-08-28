@@ -30,4 +30,8 @@ class RPCClient(RPCClientBase):
         return 0.0
 
     def is_eoa(self, network: str, address: str) -> bool | None:
-        ...
+        if (client := self.client_map.get(network)):
+            return client.is_eoa(network, address)
+
+        logger.warning(f"No RPC client configured for network: {network}")
+        return None

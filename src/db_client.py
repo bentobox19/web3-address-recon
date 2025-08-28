@@ -7,7 +7,7 @@ from src.config import config
 logger = logging.getLogger(__name__)
 
 class DBClient:
-    _lock = threading.Lock()
+    _lock = threading.RLock()
     def __init__(self):
         logger.info(f"Initializing local DB at {config.SQLITE_DB_FILE}")
 
@@ -26,35 +26,44 @@ class DBClient:
         ''')
         self.conn.commit()
 
-    def get_address_record(self, network: str, address: str) -> dict | None:
-        try:
-            self.cursor.execute(
-                "SELECT * FROM addresses WHERE network = ? AND address = ?",
-                (network, address)
-            )
-            record = self.cursor.fetchone()
-            if record:
-                # Convert the Row object to a standard dictionary
-                return dict(record)
-            else:
-                return None
-        except sqlite3.Error as e:
-            logger.error("Error retrieving address record: %s", e)
-            return None
-
-    def upsert_address_record(self, record: dict):
+    def ensure_address_record(self, network: str, address: str):
         with self._lock:
             try:
                 self.cursor.execute(
                     """
-                    INSERT OR REPLACE INTO addresses (network, address, native_balance, is_eoa)
-                    VALUES (?, ?, ?, ?)
+                    INSERT INTO addresses (network, address)
+                    VALUES (?, ?)
+                    ON CONFLICT(network, address) DO NOTHING
                     """,
-                    (record.network, record.address, record.native_balance, record.is_eoa)
+                    (network, address)
+                )
+                self.conn.commit()
+            except sqlite3.Error as e:
+                logger.error("Error ensuring address record exists: %s", e)
+
+    def upsert_address_field(self, network: str, address: str, field_name: str, value):
+        if field_name not in ['native_balance', 'is_eoa']:
+            logger.error(f"Invalid field name: {field_name}")
+            return
+
+        with self._lock:
+            try:
+                self.ensure_address_record(network, address)
+
+                query = f"UPDATE addresses SET {field_name} = ? WHERE network = ? AND address = ?"
+                self.cursor.execute(
+                    query,
+                    (value, network, address)
+                )
+                self.conn.commit()
+                logger.info(
+                    f"Successfully upserted {field_name} for address {address} on network {network}"
+                )
+            except sqlite3.Error as e:
+                logger.error(
+                    f"Error upserting {field_name} for address {address} on network {network}: {e}"
                 )
 
-                self.conn.commit()
-                logger.info("Successfully upserted record for address %s on network %s",
-                            record.address, record.network)
-            except sqlite3.Error as e:
-                logger.error("Error upserting address record: %s", e)
+    def close(self):
+        logger.info("Closing DB connection")
+        self.conn.close()

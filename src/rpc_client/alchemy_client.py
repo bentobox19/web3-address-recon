@@ -28,13 +28,10 @@ class AlchemyClient(RPCClientBase):
     @sleep_and_retry
     @limits(calls=300, period=1)
     def get_native_balance(self, network: str, address: str) -> str:
-        # Check if the requested network is supported.
         if network not in self.base_urls:
             logger.error("Unsupported network: %s", network)
             return "0"
 
-        # TODO
-        # Interact with non-EVM networks
         try:
             url = self.base_urls[network]
             payload = {
