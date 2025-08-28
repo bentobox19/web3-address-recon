@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web3 Address Recon Results</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 20px;
+            background-color: #121212;
+            color: #e0e0e0;
+        }
+        h1 {
+            text-align: center;
+            color: #ffffff;
+        }
+        p {
+            text-align: center;
+            color: #a0a0a0;
+        }
+        #uploader {
+            display: block;
+            margin: 20px auto;
+            padding: 10px;
+            border: 2px dashed #444;
+            border-radius: 5px;
+            cursor: pointer;
+            text-align: center;
+            background-color: #1e1e1e;
+            color: #e0e0e0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            box-shadow: 0 2px 3px rgba(0,0,0,0.4);
+        }
+        th, td {
+            border: 1px solid #333;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #2a2a2a;
+            color: #ffffff;
+        }
+        tbody tr {
+            background-color: #1e1e1e;
+        }
+        tbody tr:nth-child(even) {
+            background-color: #242424;
+        }
+        #error-message {
+            color: #ff5555;
+            text-align: center;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Web3 Address Reconnaissance Results</h1>
+    <p>Select your <code>web3-address-recon.sqlite3</code> file to view the results.</p>
+    <input type="file" id="uploader" />
+    <div id="error-message"></div>
+    <table id="results-table">
+        <thead>
+            <tr>
+                <th>Network</th>
+                <th>Address</th>
+                <th>Native Balance (Wei)</th>
+                <th>Is EOA?</th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/sql-wasm.js"></script>
+    <script>
+        const uploader = document.getElementById('uploader');
+        const errorMessage = document.getElementById('error-message');
+
+        async function loadDatabase(file) {
+            const sqlPromise = initSqlJs({
+                locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/${file}`
+            });
+
+            const dataPromise = file.arrayBuffer();
+            const [SQL, buf] = await Promise.all([sqlPromise, dataPromise]);
+            return new SQL.Database(new Uint8Array(buf));
+        }
+
+        uploader.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) {
+                return;
+            }
+
+            // Clear previous results and errors
+            const tableBody = document.querySelector('#results-table tbody');
+            tableBody.innerHTML = '';
+            errorMessage.textContent = '';
+
+
+            try {
+                const db = await loadDatabase(file);
+                const results = db.exec("SELECT * FROM addresses");
+
+                if (results.length === 0) {
+                     errorMessage.textContent = "No data found in the 'addresses' table.";
+                     return;
+                }
+
+                const records = results[0].values;
+                records.forEach(record => {
+                    const row = tableBody.insertRow();
+                    row.insertCell().textContent = record[0]; // network
+                    row.insertCell().textContent = record[1]; // address
+                    row.insertCell().textContent = record[2]; // native_balance
+                    row.insertCell().textContent = record[3]; // is_eoa
+                });
+            } catch (err) {
+                console.error("Error processing database file:", err);
+                errorMessage.textContent = "Error: Could not read the database file. Ensure it is a valid SQLite file.";
+            }
+        });
+    </script>
+</body>
+</html>
