@@ -1,8 +1,9 @@
 import logging
+
 from functools import wraps
 
-from .base import RPCClientBase
 from .alchemy_client import AlchemyClient
+from .base import RPCClientBase
 
 logger = logging.getLogger(__name__)
 
@@ -45,21 +46,21 @@ class RPCClient(RPCClientBase):
         }
 
     @client_checker
-    def get_native_balance(self, client, network: str, address: str) -> float:
+    async def get_native_balance(self, client, network: str, address: str) -> float:
         return client.get_native_balance(network, address)
 
     @client_checker
-    def is_eoa(self, client, network: str, address: str) -> bool | None:
+    async def is_eoa(self, client, network: str, address: str) -> bool | None:
         return client.is_eoa(network, address)
 
     @client_checker
-    def is_safe(self, client, network: str, address: str) -> bool | None:
+    async def is_safe(self, client, network: str, address: str) -> bool | None:
         return client.is_safe(network, address)
 
-    @client_checker
-    def get_safe_owners(self, client, network: str, address: str) -> list[str] | None:
-        return client.get_safe_owners(network, address)
+    # @client_checker
+    # async def get_safe_owners(self, client, network: str, address: str) -> list[str] | None:
+    #     return client.get_safe_owners(network, address)
 
-    @client_checker
-    def get_safe_threshold(self, client, network: str, address: str) -> int | None:
-        return client.get_safe_threshold(network, address)
+    # @client_checker
+    # async def get_safe_threshold(self, client, network: str, address: str) -> int | None:
+    #     return client.get_safe_threshold(network, address)

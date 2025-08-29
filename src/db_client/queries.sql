@@ -1,0 +1,60 @@
+/*
+    TODO
+    Field `safe_threshold` denormalized for perfomance.
+    Refactor to a separate 'safes' table if scaling requires.
+*/
+
+-- name: create_addresses_table!
+CREATE TABLE IF NOT EXISTS addresses (
+    network TEXT,
+    address TEXT,
+    native_balance TEXT,
+    is_eoa BOOLEAN,
+    is_safe BOOLEAN,
+    safe_threshold INTEGER,
+    PRIMARY KEY (network, address)
+)
+
+-- name: insert_into_addresses!
+INSERT INTO addresses (
+    network,
+    address
+) VALUES (
+    :network,
+    :address
+) ON CONFLICT(network, address)
+DO NOTHING;
+
+-- name: update_native_balance!
+UPDATE addresses
+SET native_balance = :value
+WHERE network = :network AND address = :address;
+
+-- name: update_is_eoa!
+UPDATE addresses
+SET is_eoa = :value
+WHERE network = :network AND address = :address;
+
+-- name: update_is_safe!
+UPDATE addresses
+SET is_safe = :value
+WHERE network = :network AND address = :address;
+
+-- name: update_safe_threshold!
+UPDATE addresses
+SET safe_threshold = :value
+WHERE network = :network AND address = :address;
+
+
+/*
+# await self._conn.execute('''
+#     CREATE TABLE IF NOT EXISTS safe_owners (
+#         network TEXT,
+#         safe_address TEXT,
+#         owner_address TEXT,
+#         PRIMARY KEY (network, safe_address, owner_address),
+#         FOREIGN KEY (network, safe_address)
+#         REFERENCES addresses (network, address)
+#     )
+# ''')
+*/

@@ -6,10 +6,6 @@ import sys
 from dotenv import load_dotenv
 
 class Config:
-    """
-    A singleton-like class for managing application configuration, environment
-    variables, command-line arguments, and logging setup.
-    """
     def __init__(self):
         self._load_envs()
         self._parser = self._create_parser()
@@ -47,6 +43,13 @@ class Config:
             choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
             help="Set the logging level"
         )
+        parser.add_argument(
+            '-w', '--workers',
+            dest='workers',
+            type=int,
+            default=10,
+            help="Number of concurrent workers"
+        )
         return parser
 
     def _parse_args(self):
@@ -59,5 +62,4 @@ class Config:
             self._parser.print_help()
             return None
 
-# Global instance of Config for easy access
 config = Config()
