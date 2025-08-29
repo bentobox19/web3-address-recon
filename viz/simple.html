@@ -56,6 +56,31 @@
             text-align: center;
             margin-top: 10px;
         }
+        .clickable-address {
+            cursor: pointer;
+            text-decoration: underline;
+            color: #64b5f6;
+        }
+        #detail-view {
+            display: none;
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #1e1e1e;
+            border: 1px solid #333;
+            border-radius: 5px;
+        }
+        #detail-view h2 {
+            margin-top: 0;
+        }
+        #back-button {
+            margin-bottom: 20px;
+            padding: 10px 15px;
+            background-color: #2a2a2a;
+            border: none;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -64,23 +89,40 @@
     <p>Select your <code>web3-address-recon.sqlite3</code> file to view the results.</p>
     <input type="file" id="uploader" />
     <div id="error-message"></div>
-    <table id="results-table">
-        <thead>
-            <tr>
-                <th>Network</th>
-                <th>Address</th>
-                <th>Native Balance (Wei)</th>
-                <th>Is EOA?</th>
-            </tr>
-        </thead>
-        <tbody>
-        </tbody>
-    </table>
+
+    <div id="table-view">
+        <table id="results-table">
+            <thead>
+                <tr>
+                    <th>Network</th>
+                    <th>Address</th>
+                    <th>Native Balance (Wei)</th>
+                    <th>Is EOA?</th>
+                    <th>Is Safe?</th>
+                    <th>Safe Threshold</th>
+                    <th>Etherscan</th>
+                </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+    </div>
+
+    <div id="detail-view">
+        <button id="back-button">&larr; Back to Results</button>
+        <h2 id="detail-address"></h2>
+        <div id="detail-properties"></div>
+    </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/sql-wasm.js"></script>
     <script>
         const uploader = document.getElementById('uploader');
         const errorMessage = document.getElementById('error-message');
+        const tableView = document.getElementById('table-view');
+        const detailView = document.getElementById('detail-view');
+        const backButton = document.getElementById('back-button');
+
+        let db;
 
         async function loadDatabase(file) {
             const sqlPromise = initSqlJs({
@@ -92,40 +134,105 @@
             return new SQL.Database(new Uint8Array(buf));
         }
 
+        function renderTable() {
+            const tableBody = document.querySelector('#results-table tbody');
+            tableBody.innerHTML = '';
+            const results = db.exec("SELECT * FROM addresses");
+
+            if (results.length === 0) {
+                 errorMessage.textContent = "No data found in the 'addresses' table.";
+                 return;
+            }
+
+            const records = results[0].values;
+            records.forEach(record => {
+                const row = tableBody.insertRow();
+                row.insertCell().textContent = record[0]; // network
+
+                const addressCell = row.insertCell();
+                addressCell.textContent = record[1]; // address
+                addressCell.classList.add('clickable-address');
+                addressCell.addEventListener('click', () => showDetail(record[0], record[1]));
+
+
+                row.insertCell().textContent = record[2]; // native_balance
+                row.insertCell().textContent = record[3]; // is_eoa
+                row.insertCell().textContent = record[4]; // is_safe
+                row.insertCell().textContent = record[5]; // safe_threshold
+
+                const etherscanCell = row.insertCell();
+                if (record[0] === 'ethereum') {
+                    const link = document.createElement('a');
+                    link.href = `https://etherscan.io/address/${record[1]}`;
+                    link.textContent = "View";
+                    link.target = "_blank";
+                    etherscanCell.appendChild(link);
+                }
+            });
+        }
+
+        function showDetail(network, address) {
+            tableView.style.display = 'none';
+            detailView.style.display = 'block';
+
+            document.getElementById('detail-address').textContent = address;
+            const propertiesDiv = document.getElementById('detail-properties');
+            propertiesDiv.innerHTML = '';
+
+            const stmt = db.prepare("SELECT * FROM addresses WHERE network = :network AND address = :address");
+            stmt.bind({ ':network': network, ':address': address });
+            stmt.step();
+            const addressData = stmt.getAsObject();
+            stmt.free();
+
+            for (const [key, value] of Object.entries(addressData)) {
+                const p = document.createElement('p');
+                p.innerHTML = `<strong>${key}:</strong> ${value}`;
+                propertiesDiv.appendChild(p);
+            }
+
+            if (addressData.is_safe) {
+                const ownersStmt = db.prepare("SELECT owner_address FROM safe_owners WHERE network = :network AND safe_address = :address");
+                ownersStmt.bind({ ':network': network, ':address': address });
+
+                const ownersList = document.createElement('ul');
+                const title = document.createElement('h3');
+                title.textContent = "Safe Owners";
+                propertiesDiv.appendChild(title);
+                propertiesDiv.appendChild(ownersList);
+
+                while(ownersStmt.step()) {
+                    const owner = ownersStmt.get()[0];
+                    const li = document.createElement('li');
+                    li.textContent = owner;
+                    ownersList.appendChild(li);
+                }
+                ownersStmt.free();
+            }
+        }
+
         uploader.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file) {
                 return;
             }
-
-            // Clear previous results and errors
-            const tableBody = document.querySelector('#results-table tbody');
-            tableBody.innerHTML = '';
             errorMessage.textContent = '';
 
 
             try {
-                const db = await loadDatabase(file);
-                const results = db.exec("SELECT * FROM addresses");
-
-                if (results.length === 0) {
-                     errorMessage.textContent = "No data found in the 'addresses' table.";
-                     return;
-                }
-
-                const records = results[0].values;
-                records.forEach(record => {
-                    const row = tableBody.insertRow();
-                    row.insertCell().textContent = record[0]; // network
-                    row.insertCell().textContent = record[1]; // address
-                    row.insertCell().textContent = record[2]; // native_balance
-                    row.insertCell().textContent = record[3]; // is_eoa
-                });
+                db = await loadDatabase(file);
+                renderTable();
             } catch (err) {
                 console.error("Error processing database file:", err);
                 errorMessage.textContent = "Error: Could not read the database file. Ensure it is a valid SQLite file.";
             }
         });
+
+        backButton.addEventListener('click', () => {
+            detailView.style.display = 'none';
+            tableView.style.display = 'block';
+        });
+
     </script>
 </body>
 </html>
