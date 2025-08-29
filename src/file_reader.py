@@ -18,10 +18,9 @@ class FileReader:
                     parts = line.split(' ', 1)
                     if len(parts) == 2:
                         network, address = parts
-                        parsed_data.append((network.lower(), address.lower()))
+                        parsed_data.append((network.lower(), address.lower().strip()))
                     else:
                         logger.warning(f"Skipping malformed line at index {i}: '{line}'")
-
                 logger.info(f"Read {len(parsed_data)} addresses")
                 return parsed_data
         except FileNotFoundError:

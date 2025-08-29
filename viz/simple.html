@@ -99,7 +99,9 @@
                     <th>Native Balance (Wei)</th>
                     <th>Is EOA?</th>
                     <th>Is Safe?</th>
+                    <th>Safe Owner Count</th>
                     <th>Safe Threshold</th>
+                    <th>Safe Nonce</th>
                     <th>Etherscan</th>
                 </tr>
             </thead>
@@ -158,7 +160,9 @@
                 row.insertCell().textContent = record[2]; // native_balance
                 row.insertCell().textContent = record[3]; // is_eoa
                 row.insertCell().textContent = record[4]; // is_safe
-                row.insertCell().textContent = record[5]; // safe_threshold
+                row.insertCell().textContent = record[5]; // safe_owner_count
+                row.insertCell().textContent = record[6]; // safe_threshold
+                row.insertCell().textContent = record[7]; // safe_nonce
 
                 const etherscanCell = row.insertCell();
                 if (record[0] === 'ethereum') {
