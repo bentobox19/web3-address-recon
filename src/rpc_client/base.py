@@ -13,10 +13,10 @@ class RPCClientBase(ABC):
     async def is_safe(self, network: str, address: str) -> bool | None:
         ...
 
-    # @abstractmethod
-    # async def get_safe_owners(self, network: str, address: str) -> list[str] | None:
-    #     ...
+    @abstractmethod
+    async def get_safe_owners(self, network: str, address: str) -> list[str] | None:
+        ...
 
-    # @abstractmethod
-    # async def get_safe_threshold(self, network: str, address: str) -> int | None:
-    #     ...
+    @abstractmethod
+    async def get_safe_threshold(self, network: str, address: str) -> int | None:
+        ...
