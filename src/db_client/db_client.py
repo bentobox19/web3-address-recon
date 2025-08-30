@@ -49,6 +49,7 @@ class DBClient:
             'is_eoa': self._queries.update_is_eoa,
             'is_safe': self._queries.update_is_safe,
             'safe_threshold': self._queries.update_safe_threshold,
+            'safe_nonce': self._queries.update_safe_nonce,
         }
         query_func = query_map.get(field_name)
 

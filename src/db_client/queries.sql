@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS addresses (
     is_safe BOOLEAN,
     safe_owner_count INTEGER,
     safe_threshold INTEGER,
+    safe_nonce INTEGER,
     PRIMARY KEY (network, address)
 )
 
@@ -55,4 +56,9 @@ WHERE network = :network AND address = :address;
 -- name: update_safe_threshold!
 UPDATE addresses
 SET safe_threshold = :value
+WHERE network = :network AND address = :address;
+
+-- name: update_safe_nonce!
+UPDATE addresses
+SET safe_nonce = :value
 WHERE network = :network AND address = :address;

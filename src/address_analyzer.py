@@ -65,10 +65,19 @@ class AddressAnalyzer:
                 elif task_type == 'fetch_is_safe':
                     field, value = await self._fetch_is_safe(network, address)
                     await self.db_client.upsert_address_field(network, address, field, value)
-                #     # If it's a safe, produce new dependent tasks
-                #     if value is True:
-                #         await self.queue.put(('fetch_safe_owners', network, address))
-                #         await self.queue.put(('fetch_safe_threshold', network, address))
+                    # If it's a safe, produce new dependent tasks
+                    if value is True:
+                        await self.queue.put(('fetch_safe_threshold', network, address))
+                        await self.queue.put(('fetch_safe_nonce', network, address))
+                        # await self.queue.put(('fetch_safe_owners', network, address))
+
+                elif task_type == 'fetch_safe_threshold':
+                    field, value = await self._fetch_safe_threshold(network, address)
+                    await self.db_client.upsert_address_field(network, address, field, value)
+
+                elif task_type == 'fetch_safe_nonce':
+                    field, value = await self._fetch_safe_nonce(network, address)
+                    await self.db_client.upsert_address_field(network, address, field, value)
 
                 # elif task_type == 'fetch_safe_owners':
                 #     field, value = await self._fetch_safe_owners(network, address)
@@ -76,9 +85,7 @@ class AddressAnalyzer:
                 #     if value:
                 #         await self.db_client.add_safe_owners(network, address, value)
 
-                # elif task_type == 'fetch_safe_threshold':
-                #     field, value = await self._fetch_safe_threshold(network, address)
-                #     await self.db_client.upsert_address_field(network, address, field, value)
+
 
             except asyncio.CancelledError:
                 # The worker was gracefully cancelled
@@ -104,12 +111,17 @@ class AddressAnalyzer:
         logger.debug(f"Retrieved Safe wallet status - {network}:{address} - {is_safe}")
         return 'is_safe', is_safe
 
+    async def _fetch_safe_threshold(self, network: str, address: str):
+        threshold = await self.rpc_client.get_safe_threshold(network, address)
+        logger.debug(f"Retrieved Safe threshold - {network}:{address} - {threshold}")
+        return 'safe_threshold', threshold
+
+    async def _fetch_safe_nonce(self, network: str, address: str):
+        nonce = await self.rpc_client.get_safe_nonce(network, address)
+        logger.debug(f"Retrieved Safe nonce - {network}:{address} - {nonce}")
+        return 'safe_nonce', nonce
+
     # async def _fetch_safe_owners(self, network: str, address: str):
     #     owners = await self.rpc_client.get_safe_owners(network, address)
     #     logger.debug(f"Safe Owners - {network}:{address} - {owners}")
     #     return 'safe_owners', owners
-
-    # async def _fetch_safe_threshold(self, network: str, address: str):
-    #     threshold = await self.rpc_client.get_safe_threshold(network, address)
-    #     logger.debug(f"Safe Threshold - {network}:{address} - {threshold}")
-    #     return 'safe_threshold', threshold
