@@ -58,9 +58,13 @@ class RPCClient(RPCClientBase):
         return client.is_safe(network, address)
 
     @client_checker
-    async def get_safe_owners(self, client, network: str, address: str) -> list[str] | None:
-        return client.get_safe_owners(network, address)
-
-    @client_checker
     async def get_safe_threshold(self, client, network: str, address: str) -> int | None:
         return client.get_safe_threshold(network, address)
+
+    @client_checker
+    async def get_safe_nonce(self, client, network: str, address: str) -> int | None:
+        return client.get_safe_threshold(network, address)
+
+    @client_checker
+    async def get_safe_owners(self, client, network: str, address: str) -> list[str] | None:
+        return client.get_safe_owners(network, address)

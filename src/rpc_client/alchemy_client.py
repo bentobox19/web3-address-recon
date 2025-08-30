@@ -35,7 +35,31 @@ class AlchemyClient(RPCClientBase):
             return result == '0x'
         return None
 
-    # Check for masterCopy() method (0xa619486e), a good indicator of a Gnosis Safe proxy
+    # Check for masterCopy() (method signature 0xa619486e), a good indicator of a Gnosis Safe proxy
     @alchemy_request("eth_call", params_builder=lambda addr: [{"to": addr, "data": "0xa619486e"}, "latest"])
     def is_safe(self, network: str, address: str, result: str | None) -> bool | None:
         return result is not None and result != '0x'
+
+    # Check for getThreshold() (method signature 0xe75235b8)
+    @alchemy_request("eth_call", params_builder=lambda addr: [{"to": addr, "data": "0xe75235b8"}, "latest"])
+    def get_safe_threshold(self, network: str, address: str, result: str | None) -> int | None:
+        if result and result != '0x':
+            return int(result, 16)
+        return None
+
+    # Check for nonce() (method signature 0xaffed0e0)
+    @alchemy_request("eth_call", params_builder=lambda addr: [{"to": addr, "data": "0xaffed0e0"}, "latest"])
+    def get_safe_nonce(self, network: str, address: str, result: str | None) -> int | None:
+        if result and result != '0x':
+            return int(result, 16)
+        return None
+
+    # Check for getOwners(method signature 0xa0551c35)
+    @alchemy_request("eth_call", params_builder=lambda addr: [{"to": addr, "data": "0xa0551c35"}, "latest"])
+    def get_safe_owners(self, network: str, address: str, result: str | None) -> list[str] | None:
+        if result and result != '0x':
+            # The result is a hex string of tightly packed addresses.
+            # We skip the first 32 bytes (64 hex characters) which is the offset, and the next 32 bytes which is the length.
+            raw_owners = result[130:]
+            return [f"0x{raw_owners[i:i+40]}" for i in range(0, len(raw_owners), 40)]
+        return None

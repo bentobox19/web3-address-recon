@@ -14,9 +14,14 @@ class RPCClientBase(ABC):
         ...
 
     @abstractmethod
-    async def get_safe_owners(self, network: str, address: str) -> list[str] | None:
+    async def get_safe_threshold(self, network: str, address: str) -> int | None:
         ...
 
     @abstractmethod
-    async def get_safe_threshold(self, network: str, address: str) -> int | None:
+    async def get_safe_nonce(self, network: str, address: str) -> int | None:
         ...
+
+    @abstractmethod
+    async def get_safe_owners(self, network: str, address: str) -> list[str] | None:
+        ...
+
