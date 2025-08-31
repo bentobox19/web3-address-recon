@@ -12,7 +12,7 @@ This tool processes a list of Web3 addresses from a TXT file, fetches informatio
 - Usage
     - Input Format
 - Features
-- Potential Missing Features
+- Upcoming Features
 
 <!-- /MarkdownTOC -->
 
@@ -69,16 +69,22 @@ Polygon 0xa1eDedeF63bnef0ean2d2D0n71bnnDF88F715n43ec4fE
 
 ## Features
 
+- Native balance
 - Checks if EOA or contract
 - Detects if Gnosis Safe
-- For Safe: owners, threshold, version
-- Native balance, nonce
-- Balances in specified tokens (network-specific)
-- Latest asset transfers (up to 10)
+  - If it is Safe: owners, threshold, nonce
+- A simple-page visualization of the data
 
-## Potential Missing Features
+## Upcoming Features
 
+- Reconnaisance on Safe owners
+- Some data analysis and visualization on Safe addresses
+- Levels of update
+- Native nonce
+- Portfolio ERC tokens and balances
+- Store price at time T
+- Market value at time T
 - ENS resolution (Ethereum)
 - NFT holdings
-- Flag to force update in the local DB
-- Export of the DB to CSV/JSON.
+- Explore other EVM networks
+- Support SOL, BTC, FLI, NEAR, TRON, Sei, ZkSync
