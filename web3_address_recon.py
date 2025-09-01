@@ -36,4 +36,8 @@ async def main():
         await db_client.close()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\nProcess interrupted by user. Shutting down.")
+        sys.exit(0)
