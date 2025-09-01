@@ -1,5 +1,8 @@
 # Python
 __pycache__/
 
+# uv
+uv.lock
+
 # Environment
 .env
