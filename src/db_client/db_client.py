@@ -30,7 +30,8 @@ class DBClient:
     async def _initialize_schema(self):
         logger.info(f"Initializing async local DB at {self._db_file}")
         await self._queries.create_addresses_table(self._conn)
-        await self._queries.create_safe_owners_table(self._conn)
+        await self._queries.create_safe_wallets_table(self._conn)
+        await self._queries.create_safe_wallet_owners_table(self._conn)
         await self._conn.commit()
 
     @locked("_lock")
@@ -47,15 +48,11 @@ class DBClient:
         query_map = {
             'native_balance': self._queries.update_native_balance,
             'is_eoa': self._queries.update_is_eoa,
-            'is_safe': self._queries.update_is_safe,
-            'safe_threshold': self._queries.update_safe_threshold,
-            'safe_nonce': self._queries.update_safe_nonce,
-            'safe_owner_count': self._queries.update_safe_owner_count,
         }
         query_func = query_map.get(field_name)
 
         if not query_func:
-            logger.error(f"Invalid field name: {field_name}")
+            logger.error(f"Invalid field name for address record: {field_name}")
             return
 
         await query_func(
@@ -67,9 +64,39 @@ class DBClient:
         await self._conn.commit()
 
     @locked("_lock")
-    async def add_safe_owners(self, network: str, safe_address: str, owners: list):
+    async def add_safe_wallet(self, network: str, address: str):
+        await self._queries.insert_into_safe_wallets(
+            self._conn,
+            network=network,
+            address=address,
+        )
+        await self._conn.commit()
+
+    @locked("_lock")
+    async def upsert_safe_wallet_field(self, network: str, address: str, field_name: str, value):
+        query_map = {
+            'safe_threshold': self._queries.update_safe_threshold,
+            'safe_nonce': self._queries.update_safe_nonce,
+            'safe_owner_count': self._queries.update_safe_owner_count,
+        }
+        query_func = query_map.get(field_name)
+
+        if not query_func:
+            logger.error(f"Invalid field name for safe_wallet record: {field_name}")
+            return
+
+        await query_func(
+            self._conn,
+            value=value,
+            network=network,
+            address=address
+        )
+        await self._conn.commit()
+
+    @locked("_lock")
+    async def add_safe_wallet_owners(self, network: str, safe_address: str, owners: list):
         for owner_address in owners:
-            await self._queries.insert_into_safe_owners(
+            await self._queries.insert_into_safe_wallet_owners(
                 self._conn,
                 network=network,
                 safe_address=safe_address,

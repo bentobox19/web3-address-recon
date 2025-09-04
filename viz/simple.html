@@ -98,7 +98,6 @@
                     <th>Address</th>
                     <th>Native Balance (Wei)</th>
                     <th>Is EOA?</th>
-                    <th>Is Safe?</th>
                     <th>Safe Owner Count</th>
                     <th>Safe Threshold</th>
                     <th>Safe Nonce</th>
@@ -139,7 +138,18 @@
         function renderTable() {
             const tableBody = document.querySelector('#results-table tbody');
             tableBody.innerHTML = '';
-            const results = db.exec("SELECT * FROM addresses");
+            const results = db.exec(`
+                SELECT
+                    a.network,
+                    a.address,
+                    a.native_balance,
+                    a.is_eoa,
+                    sw.owner_count,
+                    sw.threshold,
+                    sw.nonce
+                FROM addresses a
+                LEFT JOIN safe_wallets sw ON a.network = sw.network AND a.address = sw.address
+            `);
 
             if (results.length === 0) {
                  errorMessage.textContent = "No data found in the 'addresses' table.";
@@ -159,10 +169,9 @@
 
                 row.insertCell().textContent = record[2]; // native_balance
                 row.insertCell().textContent = record[3]; // is_eoa
-                row.insertCell().textContent = record[4]; // is_safe
-                row.insertCell().textContent = record[5]; // safe_owner_count
-                row.insertCell().textContent = record[6]; // safe_threshold
-                row.insertCell().textContent = record[7]; // safe_nonce
+                row.insertCell().textContent = record[4]; // safe_owner_count
+                row.insertCell().textContent = record[5]; // safe_threshold
+                row.insertCell().textContent = record[6]; // safe_nonce
 
                 const etherscanCell = row.insertCell();
                 if (record[0] === 'ethereum') {
@@ -195,8 +204,19 @@
                 propertiesDiv.appendChild(p);
             }
 
-            if (addressData.is_safe) {
-                const ownersStmt = db.prepare("SELECT owner_address FROM safe_owners WHERE network = :network AND safe_address = :address");
+            const safeStmt = db.prepare("SELECT * FROM safe_wallets WHERE network = :network AND address = :address");
+            safeStmt.bind({ ':network': network, ':address': address });
+            if (safeStmt.step()) {
+                const safeData = safeStmt.getAsObject();
+                for (const [key, value] of Object.entries(safeData)) {
+                    if (key !== 'network' && key !== 'address') {
+                        const p = document.createElement('p');
+                        p.innerHTML = `<strong>${key}:</strong> ${value}`;
+                        propertiesDiv.appendChild(p);
+                    }
+                }
+
+                const ownersStmt = db.prepare("SELECT owner_address FROM safe_wallet_owners WHERE network = :network AND safe_address = :address");
                 ownersStmt.bind({ ':network': network, ':address': address });
 
                 const ownersList = document.createElement('ul');
@@ -213,6 +233,7 @@
                 }
                 ownersStmt.free();
             }
+            safeStmt.free();
         }
 
         uploader.addEventListener('change', async (e) => {

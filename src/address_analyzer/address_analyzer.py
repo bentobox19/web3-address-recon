@@ -64,26 +64,25 @@ class AddressAnalyzer:
 
                 elif task_type == 'fetch_is_safe':
                     field, value = await self._fetch_is_safe(network, address)
-                    await self.db_client.upsert_address_field(network, address, field, value)
-                    # If it's a safe, produce new dependent tasks
                     if value is True:
+                        await self.db_client.add_safe_wallet(network, address)
                         await self.queue.put(('fetch_safe_threshold', network, address))
                         await self.queue.put(('fetch_safe_nonce', network, address))
                         await self.queue.put(('fetch_safe_owners', network, address))
 
                 elif task_type == 'fetch_safe_threshold':
                     field, value = await self._fetch_safe_threshold(network, address)
-                    await self.db_client.upsert_address_field(network, address, field, value)
+                    await self.db_client.upsert_safe_wallet_field(network, address, field, value)
 
                 elif task_type == 'fetch_safe_nonce':
                     field, value = await self._fetch_safe_nonce(network, address)
-                    await self.db_client.upsert_address_field(network, address, field, value)
+                    await self.db_client.upsert_safe_wallet_field(network, address, field, value)
 
                 elif task_type == 'fetch_safe_owners':
                     field, owners = await self._fetch_safe_owners(network, address)
                     if owners:
-                        await self.db_client.upsert_address_field(network, address, 'safe_owner_count', len(owners))
-                        await self.db_client.add_safe_owners(network, address, owners)
+                        await self.db_client.upsert_safe_wallet_field(network, address, 'safe_owner_count', len(owners))
+                        await self.db_client.add_safe_wallet_owners(network, address, owners)
                         # TODO
                         # The owners we discover are record into our addresses database
                         # for further processing.
