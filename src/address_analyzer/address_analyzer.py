@@ -83,17 +83,6 @@ class AddressAnalyzer:
                     if owners:
                         await self.db_client.upsert_safe_wallet_field(network, address, 'safe_owner_count', len(owners))
                         await self.db_client.add_safe_wallet_owners(network, address, owners)
-                        # TODO
-                        # The owners we discover are record into our addresses database
-                        # for further processing.
-                        # We want to have some additional flags to show why we included them,
-                        # and some controls to avoid infinite loops (e.g. A -> B -> C -> A).
-                        # for owner_address in owners:
-                        #     await self.db_client.ensure_address_record(
-                        #         network,
-                        #         owner_address
-                        #     )
-                        #     await self.queue.put(('initial_check', network, owner_address))
 
             except asyncio.CancelledError:
                 break
