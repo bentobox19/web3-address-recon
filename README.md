@@ -1,6 +1,6 @@
 # Web3 Address Recon
 
-This tool processes a list of Web3 addresses from a TXT file, fetches information using Alchemy API, stores it in SQLite, and avoids redundant API calls by checking the database first.
+This tool processes a list of Web3 addresses from a TXT file, fetches information using the Alchemy API, stores the results in SQLite.
 
 <!-- MarkdownTOC -->
 
