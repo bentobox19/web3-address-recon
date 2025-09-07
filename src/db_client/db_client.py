@@ -3,9 +3,9 @@ import aiosqlite
 import asyncio
 import logging
 import os
+from typing import Dict, Any, List
 
 from src.config import config
-from .decorators import locked
 
 logger = logging.getLogger(__name__)
 
@@ -16,92 +16,59 @@ class DBClient:
         queries_sql_file_path = os.path.join(current_dir, "queries.sql")
         self._queries = aiosql.from_path(queries_sql_file_path, "aiosqlite")
         self._conn = None
-        self._lock = asyncio.Lock()
 
     async def connect(self):
         if self._conn:
             return
         self._conn = await aiosqlite.connect(self._db_file)
-        await self._conn.execute("PRAGMA journal_mode=DELETE")
+        await self._conn.execute("PRAGMA journal_mode=WAL")
         await self._conn.commit()
         await self._initialize_schema()
 
-    @locked("_lock")
     async def _initialize_schema(self):
         logger.info(f"Initializing async local DB at {self._db_file}")
         await self._queries.create_addresses_table(self._conn)
+        await self._queries.create_evm_properties_table(self._conn)
         await self._queries.create_safe_wallets_table(self._conn)
         await self._queries.create_safe_wallet_owners_table(self._conn)
         await self._conn.commit()
 
-    @locked("_lock")
-    async def ensure_address_record(self, network: str, address: str):
-        await self._queries.insert_into_addresses(
-            self._conn,
-            network=network,
-            address=address
-        )
-        await self._conn.commit()
-
-    @locked("_lock")
-    async def upsert_address_field(self, network: str, address: str, field_name: str, value):
-        query_map = {
-            'native_balance': self._queries.update_native_balance,
-            'is_eoa': self._queries.update_is_eoa,
-        }
-        query_func = query_map.get(field_name)
-
-        if not query_func:
-            logger.error(f"Invalid field name for address record: {field_name}")
-            return
-
-        await query_func(
-            self._conn,
-            value=value,
-            network=network,
-            address=address
-        )
-        await self._conn.commit()
-
-    @locked("_lock")
-    async def add_safe_wallet(self, network: str, address: str):
-        await self._queries.insert_into_safe_wallets(
-            self._conn,
+    async def add_address(self, network: str, address: str, source: str) -> int:
+        result = await self._queries.insert_address(self._conn,
             network=network,
             address=address,
+            source=source
         )
         await self._conn.commit()
 
-    @locked("_lock")
-    async def upsert_safe_wallet_field(self, network: str, address: str, field_name: str, value):
-        query_map = {
-            'safe_threshold': self._queries.update_safe_threshold,
-            'safe_nonce': self._queries.update_safe_nonce,
-            'safe_owner_count': self._queries.update_safe_owner_count,
-        }
-        query_func = query_map.get(field_name)
+        return result[0][0] if result else None
 
-        if not query_func:
-            logger.error(f"Invalid field name for safe_wallet record: {field_name}")
-            return
-
-        await query_func(
+    async def save_evm_properties(self, address_id: int, properties: Dict[str, Any]):
+        await self._queries.upsert_evm_properties(
             self._conn,
-            value=value,
-            network=network,
-            address=address
+            address_id=address_id,
+            native_balance=properties.get('native_balance'),
+            is_eoa=properties.get('is_eoa'),
+            is_safe=properties.get('is_safe'),
         )
         await self._conn.commit()
 
-    @locked("_lock")
-    async def add_safe_wallet_owners(self, network: str, safe_address: str, owners: list):
-        for owner_address in owners:
-            await self._queries.insert_into_safe_wallet_owners(
+    async def save_safe_wallet_data(self, safe_address_id: int, owners: List[str], safe_wallet_data: Dict[str, Any]):
+        await self._queries.upsert_safe_wallet(
+            self._conn,
+            address_id=safe_address_id,
+            threshold=safe_wallet_data.get('threshold'),
+            nonce=safe_wallet_data.get('nonce'),
+            owner_count=len(owners) if owners else None
+        )
+
+        for owner in owners:
+            await self._queries.insert_safe_wallet_owner(
                 self._conn,
-                network=network,
-                safe_address=safe_address,
-                owner_address=owner_address
+                safe_address_id=safe_address_id,
+                owner_address=owner
             )
+
         await self._conn.commit()
 
     async def close(self):

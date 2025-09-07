@@ -17,7 +17,6 @@
             color: #ffffff;
         }
         p {
-            text-align: center;
             color: #a0a0a0;
         }
         #uploader {
@@ -52,6 +51,12 @@
         tbody tr:nth-child(even) {
             background-color: #242424;
         }
+        .safe-wallet-row {
+            background-color: #1c252c !important; /* Subtle dark cyan/grey */
+        }
+        .safe-wallet-row:nth-child(even) {
+            background-color: #222b31 !important; /* Slightly lighter subtle dark cyan/grey */
+        }
         #error-message {
             color: #ff5555;
             text-align: center;
@@ -73,6 +78,14 @@
         #detail-view h2 {
             margin-top: 0;
         }
+        #detail-view h3 {
+            margin-top: 25px;
+            border-bottom: 1px solid #444;
+            padding-bottom: 5px;
+        }
+        #detail-view p {
+            text-align: left;
+        }
         #back-button {
             margin-bottom: 20px;
             padding: 10px 15px;
@@ -87,7 +100,7 @@
 <body>
 
     <h1>Web3 Address Reconnaissance Results</h1>
-    <p>Select your <code>web3-address-recon.sqlite3</code> file to view the results.</p>
+    <p style="text-align: center;">Select your <code>web3-address-recon.sqlite3</code> file to view the results.</p>
     <input type="file" id="uploader" />
     <div id="error-message"></div>
 
@@ -143,39 +156,44 @@
                 SELECT
                     a.network,
                     a.address,
-                    a.native_balance,
-                    a.is_eoa,
+                    evm.native_balance,
+                    evm.is_eoa,
                     sw.owner_count,
                     sw.threshold,
                     sw.nonce
                 FROM addresses a
-                LEFT JOIN safe_wallets sw ON a.network = sw.network AND a.address = sw.address
+                LEFT JOIN evm_properties evm ON a.id = evm.address_id
+                LEFT JOIN safe_wallets sw ON a.id = sw.address_id
             `);
 
             if (results.length === 0) {
-                 errorMessage.textContent = "No data found in the 'addresses' table.";
-                 return;
+                    errorMessage.textContent = "No data found. The database might be empty.";
+                    return;
             }
 
             const records = results[0].values;
             records.forEach(record => {
                 const row = tableBody.insertRow();
-                row.insertCell().textContent = record[0]; // network
+                const isSafe = record[5] !== null;
+                if (isSafe) {
+                    row.classList.add('safe-wallet-row');
+                }
+
+                row.insertCell().textContent = record[0] || 'N/A';
 
                 const addressCell = row.insertCell();
-                addressCell.textContent = record[1]; // address
+                addressCell.textContent = record[1] || 'N/A';
                 addressCell.classList.add('clickable-address');
                 addressCell.addEventListener('click', () => showDetail(record[0], record[1]));
 
-
-                row.insertCell().textContent = record[2]; // native_balance
-                row.insertCell().textContent = record[3]; // is_eoa
-                row.insertCell().textContent = record[4]; // safe_owner_count
-                row.insertCell().textContent = record[5]; // safe_threshold
-                row.insertCell().textContent = record[6]; // safe_nonce
+                row.insertCell().textContent = record[2] || 'N/A';
+                row.insertCell().textContent = record[3] === null ? 'N/A' : (record[3] ? 'Yes' : 'No');
+                row.insertCell().textContent = record[4] || 'N/A';
+                row.insertCell().textContent = record[5] || 'N/A';
+                row.insertCell().textContent = record[6] || 'N/A';
 
                 const etherscanCell = row.insertCell();
-                if (record[0] === 'ethereum') {
+                if (record[0] === 'ethereum' && record[1]) {
                     const link = document.createElement('a');
                     link.href = `https://etherscan.io/address/${record[1]}`;
                     link.textContent = "View";
@@ -193,54 +211,87 @@
             const propertiesDiv = document.getElementById('detail-properties');
             propertiesDiv.innerHTML = '';
 
-            const stmt = db.prepare("SELECT * FROM addresses WHERE network = :network AND address = :address");
-            stmt.bind({ ':network': network, ':address': address });
-            stmt.step();
-            const addressData = stmt.getAsObject();
-            stmt.free();
-
-            for (const [key, value] of Object.entries(addressData)) {
-                const p = document.createElement('p');
-                p.innerHTML = `<strong>${key}:</strong> ${value}`;
-                propertiesDiv.appendChild(p);
+            const idStmt = db.prepare("SELECT id FROM addresses WHERE network = :network AND address = :address");
+            idStmt.bind({ ':network': network, ':address': address });
+            if (!idStmt.step()) {
+                propertiesDiv.textContent = "Could not find address details.";
+                idStmt.free();
+                return;
             }
+            const addressId = idStmt.get()[0];
+            idStmt.free();
 
-            const safeStmt = db.prepare("SELECT * FROM safe_wallets WHERE network = :network AND address = :address");
-            safeStmt.bind({ ':network': network, ':address': address });
-            if (safeStmt.step()) {
-                const safeData = safeStmt.getAsObject();
-                for (const [key, value] of Object.entries(safeData)) {
-                    if (key !== 'network' && key !== 'address') {
+            const appendProperties = (dataObject) => {
+                for (const [key, value] of Object.entries(dataObject)) {
+                    if (value !== null && key !== 'address_id') {
                         const p = document.createElement('p');
-                        p.innerHTML = `<strong>${key}:</strong> ${value}`;
+                        let displayValue = value;
+                        if (typeof value === 'boolean' || (key.includes('is_') && (value === 0 || value === 1))) {
+                            displayValue = value ? 'Yes' : 'No';
+                        }
+                        p.innerHTML = `<strong>${key.replace(/_/g, ' ')}:</strong> ${displayValue}`;
                         propertiesDiv.appendChild(p);
                     }
                 }
+            };
 
-                const ownersStmt = db.prepare("SELECT owner_address FROM safe_wallet_owners WHERE network = :network AND safe_address = :address");
-                ownersStmt.bind({ ':network': network, ':address': address });
+            const mainPropsStmt = db.prepare(`
+                SELECT a.source, evm.native_balance, evm.is_eoa, evm.is_safe
+                FROM addresses a
+                LEFT JOIN evm_properties evm ON a.id = evm.address_id
+                WHERE a.id = :address_id
+            `);
+            mainPropsStmt.bind({ ':address_id': addressId });
+            if (mainPropsStmt.step()) {
+                appendProperties(mainPropsStmt.getAsObject());
+            }
+            mainPropsStmt.free();
 
-                const ownersList = document.createElement('ul');
-                const title = document.createElement('h3');
-                title.textContent = "Safe Owners";
-                propertiesDiv.appendChild(title);
-                propertiesDiv.appendChild(ownersList);
+            const safeStmt = db.prepare("SELECT threshold, nonce, owner_count FROM safe_wallets WHERE address_id = :address_id");
+            safeStmt.bind({ ':address_id': addressId });
+            if (safeStmt.step()) {
+                appendProperties(safeStmt.getAsObject());
 
+                // CORRECTED QUERY: Selects owner_address directly without the erroneous join.
+                const ownersStmt = db.prepare(`
+                    SELECT owner_address
+                    FROM safe_wallet_owners
+                    WHERE safe_address_id = :address_id
+                `);
+                ownersStmt.bind({ ':address_id': addressId });
+
+                const owners = [];
                 while(ownersStmt.step()) {
-                    const owner = ownersStmt.get()[0];
-                    const li = document.createElement('li');
-                    li.textContent = owner;
-                    if (network === 'ethereum') {
-                        const link = document.createElement('a');
-                        link.href = `https://etherscan.io/address/${owner}`;
-                        link.textContent = "View";
-                        link.target = "_blank";
-                        link.style.marginLeft = '10px';
-                        li.appendChild(link);
-                    }
-                    ownersList.appendChild(li);
+                    owners.push(ownersStmt.get()[0]);
                 }
                 ownersStmt.free();
+
+                if (owners.length > 0) {
+                    const title = document.createElement('h3');
+                    title.textContent = "Safe Owners";
+                    propertiesDiv.appendChild(title);
+
+                    const ownersTable = document.createElement('table');
+                    const thead = ownersTable.createTHead();
+                    const headerRow = thead.insertRow();
+                    headerRow.insertCell().outerHTML = '<th>Owner Address</th>';
+                    headerRow.insertCell().outerHTML = '<th>Etherscan</th>';
+
+                    const tbody = ownersTable.createTBody();
+                    owners.forEach(owner => {
+                        const row = tbody.insertRow();
+                        row.insertCell().textContent = owner;
+                        const linkCell = row.insertCell();
+                        if (network === 'ethereum' && owner) {
+                            const link = document.createElement('a');
+                            link.href = `https://etherscan.io/address/${owner}`;
+                            link.textContent = "View";
+                            link.target = "_blank";
+                            linkCell.appendChild(link);
+                        }
+                    });
+                    propertiesDiv.appendChild(ownersTable);
+                }
             }
             safeStmt.free();
         }
@@ -251,7 +302,6 @@
                 return;
             }
             errorMessage.textContent = '';
-
 
             try {
                 db = await loadDatabase(file);

@@ -1,7 +1,6 @@
 import asyncio
 import logging
-
-from typing import List, Tuple
+from typing import List, Tuple, Set
 
 from src.config import config
 
@@ -13,77 +12,34 @@ class AddressAnalyzer:
         self.rpc_client = rpc_client
         self.queue = asyncio.Queue()
 
-    async def process(self, addresses: List[Tuple[str, str]], num_workers:int = config.args.workers):
+    async def process(self, addresses: List[Tuple[str, str]]):
         if not addresses:
             logger.info("No addresses to process.")
             return
 
-        ensure_tasks = [
-            self.db_client.ensure_address_record(network, address)
-            for network, address in addresses
-            if network in self.rpc_client.client_map
-        ]
-        await asyncio.gather(*ensure_tasks)
-        logger.info("Ensured all listed addresses are in the database")
-
         workers = [
             asyncio.create_task(self._worker(f'worker-{i}'))
-            for i in range(num_workers)
+            for i in range(config.args.workers)
         ]
 
-        try:
-            for network, address in addresses:
-                if network not in self.rpc_client.client_map:
-                    logger.error(f"Unsupported network: {network}")
-                    continue
-                await self.queue.put(('initial_check', network, address))
-            await self.queue.join()
+        for network, address in addresses:
+            if network in self.rpc_client.client_map:
+                await self.queue.put((network, address, 'input-list'))
+            else:
+                logger.error(f"Unsupported network: {network}")
 
-        finally:
-            for w in workers:
-                w.cancel()
-            await asyncio.gather(*workers, return_exceptions=True)
+        await self.queue.join()
+
+        for w in workers:
+            w.cancel()
+        await asyncio.gather(*workers, return_exceptions=True)
 
     async def _worker(self, name: str):
         while True:
             try:
-                task_type, network, address = await self.queue.get()
-
-                if task_type == 'initial_check':
-                    await self.queue.put(('fetch_balance', network, address))
-                    await self.queue.put(('fetch_is_eoa', network, address))
-                    await self.queue.put(('fetch_is_safe', network, address))
-
-                elif task_type == 'fetch_balance':
-                    field, value = await self._fetch_balance(network, address)
-                    await self.db_client.upsert_address_field(network, address, field, value)
-
-                elif task_type == 'fetch_is_eoa':
-                    field, value = await self._fetch_is_eoa(network, address)
-                    await self.db_client.upsert_address_field(network, address, field, value)
-
-                elif task_type == 'fetch_is_safe':
-                    field, value = await self._fetch_is_safe(network, address)
-                    if value is True:
-                        await self.db_client.add_safe_wallet(network, address)
-                        await self.queue.put(('fetch_safe_threshold', network, address))
-                        await self.queue.put(('fetch_safe_nonce', network, address))
-                        await self.queue.put(('fetch_safe_owners', network, address))
-
-                elif task_type == 'fetch_safe_threshold':
-                    field, value = await self._fetch_safe_threshold(network, address)
-                    await self.db_client.upsert_safe_wallet_field(network, address, field, value)
-
-                elif task_type == 'fetch_safe_nonce':
-                    field, value = await self._fetch_safe_nonce(network, address)
-                    await self.db_client.upsert_safe_wallet_field(network, address, field, value)
-
-                elif task_type == 'fetch_safe_owners':
-                    field, owners = await self._fetch_safe_owners(network, address)
-                    if owners:
-                        await self.db_client.upsert_safe_wallet_field(network, address, 'safe_owner_count', len(owners))
-                        await self.db_client.add_safe_wallet_owners(network, address, owners)
-
+                network, address, source = await self.queue.get()
+                logger.info(f"[{name}] Processing: {network}:{address}")
+                await self._analyze_address(network, address, source)
             except asyncio.CancelledError:
                 break
             except Exception as e:
@@ -91,32 +47,49 @@ class AddressAnalyzer:
             finally:
                 self.queue.task_done()
 
-    async def _fetch_balance(self, network: str, address: str):
-        balance = await self.rpc_client.get_native_balance(network, address)
-        logger.debug(f"Retrieved native balance - {network}:{address} - {balance}")
-        return 'native_balance', balance
+    async def _analyze_address(self, network: str, address: str, source: str):
+        address_id = await self.db_client.add_address(network, address, source)
 
-    async def _fetch_is_eoa(self, network: str, address: str):
-        is_eoa = await self.rpc_client.is_eoa(network, address)
-        logger.debug(f"Retrieved EOA status - {network}:{address} - {is_eoa}")
-        return 'is_eoa', is_eoa
+        logger.debug(f"obtenida address_id = {address_id}")
 
-    async def _fetch_is_safe(self, network: str, address: str):
-        is_safe = await self.rpc_client.is_safe(network, address)
-        logger.debug(f"Retrieved Safe wallet status - {network}:{address} - {is_safe}")
-        return 'is_safe', is_safe
+        # TODO
+        # Depending on the nature of the network that we will invoke this below
+        is_safe = await self._process_evm_properties(address_id, network, address)
+        if is_safe:
+            await self._process_safe_details(address_id, network, address)
 
-    async def _fetch_safe_threshold(self, network: str, address: str):
-        threshold = await self.rpc_client.get_safe_threshold(network, address)
-        logger.debug(f"Retrieved Safe threshold - {network}:{address} - {threshold}")
-        return 'safe_threshold', threshold
+    async def _process_evm_properties(self, address_id: int, network: str, address: str) -> bool:
+        balance_task = self.rpc_client.get_native_balance(network, address)
+        is_eoa_task = self.rpc_client.is_eoa(network, address)
+        is_safe_task = self.rpc_client.is_safe(network, address)
 
-    async def _fetch_safe_nonce(self, network: str, address: str):
-        nonce = await self.rpc_client.get_safe_nonce(network, address)
-        logger.debug(f"Retrieved Safe nonce - {network}:{address} - {nonce}")
-        return 'safe_nonce', nonce
+        balance, is_eoa, is_safe = await asyncio.gather(
+            balance_task, is_eoa_task, is_safe_task
+        )
 
-    async def _fetch_safe_owners(self, network: str, address: str):
-        owners = await self.rpc_client.get_safe_owners(network, address)
-        logger.debug(f"Retrieved Safe Owners - {network}:{address} - {owners}")
-        return 'safe_owners', owners
+        evm_props = {
+            "native_balance": balance,
+            "is_eoa": is_eoa,
+            "is_safe": is_safe,
+        }
+        await self.db_client.save_evm_properties(address_id, evm_props)
+
+        return is_safe
+
+    async def _process_safe_details(self, address_id: int, network: str, address: str):
+        logger.info(f"Address {network}:{address} is a Safe. Fetching details.")
+        threshold_task = self.rpc_client.get_safe_threshold(network, address)
+        nonce_task = self.rpc_client.get_safe_nonce(network, address)
+        owners_task = self.rpc_client.get_safe_owners(network, address)
+
+        threshold, nonce, owners = await asyncio.gather(
+            threshold_task, nonce_task, owners_task
+        )
+
+        safe_wallet_data = {
+            "network": network,
+            "threshold": threshold,
+            "nonce": nonce,
+        }
+
+        await self.db_client.save_safe_wallet_data(address_id, owners, safe_wallet_data)
