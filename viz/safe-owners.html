@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web3 Address Recon Dashboard</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d1d5db' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='8'></circle><line x1='21' y1='21' x2='16.65' y2='16.65'></line></svg>">
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- sql.js for in-browser SQLite database access -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+    <!-- Google Fonts for a clean look -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827; /* Dark gray background */
+        }
+        /* Custom styles for a loading spinner */
+        .loader {
+            border-top-color: #3b82f6;
+            -webkit-animation: spinner 1.5s linear infinite;
+            animation: spinner 1.5s linear infinite;
+        }
+        @-webkit-keyframes spinner {
+            0% { -webkit-transform: rotate(0deg); }
+            100% { -webkit-transform: rotate(360deg); }
+        }
+        @keyframes spinner {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="text-gray-300">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <!-- Header -->
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold text-white">Web3 Recon Dashboard</h1>
+            <p class="text-gray-400 mt-1">Upload your SQLite database to analyze wallet data.</p>
+        </header>
+
+        <!-- File Upload Section -->
+        <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
+            <label for="db-upload" class="block text-sm font-medium text-gray-400 mb-2">Database File (.sqlite3)</label>
+            <input type="file" id="db-upload" accept=".sqlite, .sqlite3, .db" class="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-800 file:text-blue-200 hover:file:bg-blue-700"/>
+            <div id="loading-indicator" class="hidden mt-4 flex items-center">
+                <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-600 h-6 w-6 mr-3"></div>
+                <span class="text-gray-400">Loading and processing database...</span>
+            </div>
+             <p id="error-message" class="text-red-500 text-sm mt-2 hidden"></p>
+        </div>
+
+        <!-- Assumption Notice -->
+        <div class="bg-yellow-900 bg-opacity-50 border-l-4 border-yellow-700 text-yellow-300 p-4 rounded-md mb-8" role="alert">
+            <p class="font-bold">Assumption</p>
+            <p>ETH price is assumed to be <strong>$4,300 USD</strong> for all calculations.</p>
+        </div>
+
+        <!-- Main Content Area - Hidden until DB is loaded -->
+        <main id="dashboard-content" class="hidden">
+            <!-- Key Statistics -->
+            <section id="key-stats" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                <div class="bg-gray-800 p-6 rounded-lg shadow-lg">
+                    <h2 class="text-sm font-medium text-gray-400 uppercase">Total Funds Surveyed</h2>
+                    <p id="total-funds" class="text-3xl font-bold mt-2 text-white">$0.00</p>
+                    <p id="total-eth" class="text-sm text-gray-400 mt-1">0 ETH</p>
+                </div>
+                <div class="bg-gray-800 p-6 rounded-lg shadow-lg">
+                    <h2 class="text-sm font-medium text-gray-400 uppercase">Funds in SAFE Wallets</h2>
+                    <p id="safe-funds" class="text-3xl font-bold mt-2 text-green-400">$0.00</p>
+                     <p id="safe-eth" class="text-sm text-gray-400 mt-1">0 ETH</p>
+                </div>
+                <div class="bg-gray-800 p-6 rounded-lg shadow-lg">
+                    <h2 class="text-sm font-medium text-gray-400 uppercase">SAFE Funds Percentage</h2>
+                    <p id="safe-percentage" class="text-3xl font-bold mt-2 text-green-400">0.00%</p>
+                    <p class="text-sm text-gray-400 mt-1">of total surveyed funds</p>
+                </div>
+            </section>
+
+            <!-- Owner Portfolios -->
+            <section id="owner-portfolios" class="bg-gray-800 p-6 rounded-lg shadow-lg mb-8">
+                <h2 class="text-xl font-bold text-white mb-4">Owner Portfolios</h2>
+                <p class="text-gray-400 mb-6">Unique owners and the cumulative value of the SAFE wallets they control.</p>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-700">
+                        <thead class="bg-gray-700">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Owner Address</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Controlled SAFE Wallets</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Total Controlled Value (USD)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="owner-table-body" class="bg-gray-800 divide-y divide-gray-700">
+                            <!-- JS will populate this -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script type="module">
+        const ETH_PRICE_USD = 4300;
+        const WEI_PER_ETH = 10n ** 18n;
+
+        const fileInput = document.getElementById('db-upload');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const dashboardContent = document.getElementById('dashboard-content');
+        const errorMessage = document.getElementById('error-message');
+
+        // Helper to format numbers as USD currency
+        const formatCurrency = (value) => {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            }).format(value);
+        };
+
+        // Helper to format large numbers with commas
+        const formatNumber = (value) => {
+            return new Intl.NumberFormat('en-US').format(value);
+        }
+
+        // Helper to convert Wei to a JS number representing ETH
+        const weiToEth = (weiString) => {
+            if (!weiString) return 0;
+            try {
+                const weiBigInt = BigInt(weiString);
+                // To avoid floating point issues, do division with some precision
+                const ethValue = Number(weiBigInt * 1000000n / WEI_PER_ETH) / 1000000;
+                return ethValue;
+            } catch (e) {
+                console.error(`Could not convert wei string to BigInt: ${weiString}`, e);
+                return 0;
+            }
+        };
+
+        const initSqlJs = async () => {
+            try {
+                const sql = await window.initSqlJs({
+                    locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/${file}`
+                });
+                return sql;
+            } catch (err) {
+                console.error("Failed to initialize sql.js:", err);
+                showError("Failed to load the SQL library. Please check your internet connection and try again.");
+                return null;
+            }
+        };
+
+        const showError = (message) => {
+            errorMessage.textContent = message;
+            errorMessage.classList.remove('hidden');
+            loadingIndicator.classList.add('hidden');
+        };
+
+        const hideError = () => {
+            errorMessage.classList.add('hidden');
+        };
+
+        fileInput.addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            hideError();
+            loadingIndicator.classList.remove('hidden');
+            dashboardContent.classList.add('hidden');
+
+            const SQL = await initSqlJs();
+            if (!SQL) return;
+
+            const fileBuffer = await file.arrayBuffer();
+
+            try {
+                const db = new SQL.Database(new Uint8Array(fileBuffer));
+                runAnalysis(db);
+                dashboardContent.classList.remove('hidden');
+            } catch (err) {
+                console.error("Error processing database file:", err);
+                showError("The file provided does not appear to be a valid SQLite database.");
+            } finally {
+                loadingIndicator.classList.add('hidden');
+            }
+        });
+
+        function runAnalysis(db) {
+            // 1. Total Funds
+            const totalFundsQuery = "SELECT SUM(CAST(native_balance AS REAL)) FROM evm_properties";
+            const totalFundsResult = db.exec(totalFundsQuery);
+            const totalFundsWei = totalFundsResult[0]?.values[0]?.[0] || '0';
+            const totalEth = weiToEth(totalFundsWei);
+            const totalFundsUsd = totalEth * ETH_PRICE_USD;
+            document.getElementById('total-funds').textContent = formatCurrency(totalFundsUsd);
+            document.getElementById('total-eth').textContent = `${totalEth.toFixed(4)} ETH`;
+
+
+            // 2. SAFE Funds
+            const safeFundsQuery = `
+                SELECT SUM(CAST(p.native_balance AS REAL))
+                FROM evm_properties p
+                WHERE p.is_safe = 1;
+            `;
+            const safeFundsResult = db.exec(safeFundsQuery);
+            const safeFundsWei = safeFundsResult[0]?.values[0]?.[0] || '0';
+            const safeEth = weiToEth(safeFundsWei);
+            const safeFundsUsd = safeEth * ETH_PRICE_USD;
+            document.getElementById('safe-funds').textContent = formatCurrency(safeFundsUsd);
+            document.getElementById('safe-eth').textContent = `${safeEth.toFixed(4)} ETH`;
+
+            // 3. SAFE Percentage
+            const safePercentage = totalFundsUsd > 0 ? (safeFundsUsd / totalFundsUsd) * 100 : 0;
+            document.getElementById('safe-percentage').textContent = `${safePercentage.toFixed(2)}%`;
+
+            // 4. Owner Portfolios
+            const ownerPortfolioQuery = `
+                SELECT
+                    swo.owner_address,
+                    a.address as safe_address,
+                    ep.native_balance
+                FROM safe_wallet_owners swo
+                JOIN addresses a ON swo.safe_address_id = a.id
+                JOIN evm_properties ep ON a.id = ep.address_id
+                WHERE ep.is_safe = 1;
+            `;
+            const ownerResults = db.exec(ownerPortfolioQuery);
+            const ownerPortfolios = {};
+
+            if (ownerResults.length > 0) {
+                ownerResults[0].values.forEach(([owner, safe, balance]) => {
+                    if (!ownerPortfolios[owner]) {
+                        ownerPortfolios[owner] = { safes: new Set(), totalWei: 0n };
+                    }
+                    ownerPortfolios[owner].safes.add(safe);
+                    ownerPortfolios[owner].totalWei += BigInt(balance || '0');
+                });
+            }
+
+            const ownerTableBody = document.getElementById('owner-table-body');
+            ownerTableBody.innerHTML = ''; // Clear previous results
+
+            // Sort owners by total controlled value
+            const sortedOwners = Object.entries(ownerPortfolios).sort(([, a], [, b]) => {
+                if (b.totalWei > a.totalWei) return 1;
+                if (b.totalWei < a.totalWei) return -1;
+                return 0;
+            });
+
+            sortedOwners.forEach(([owner, data]) => {
+                const totalEthValue = weiToEth(data.totalWei.toString());
+                const totalUsdValue = totalEthValue * ETH_PRICE_USD;
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400 font-mono">${owner}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">${data.safes.size}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-white font-semibold">${formatCurrency(totalUsdValue)}</td>
+                `;
+                ownerTableBody.appendChild(row);
+            });
+        }
+    </script>
+
+</body>
+</html>
+
