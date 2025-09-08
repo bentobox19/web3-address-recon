@@ -74,6 +74,7 @@ Polygon 0xa1eDedeF63bnef0ean2d2D0n71bnnDF88F715n43ec4fE
 - Detects if Gnosis Safe
   - If it is Safe: owners, threshold, nonce
 - A simple-page visualization of the data
+- Safe owners reconnaisanse visualization.
 
 ## Upcoming Features
 
