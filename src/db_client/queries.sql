@@ -39,6 +39,9 @@ VALUES (:network, :address, :source)
 ON CONFLICT(network, address) DO NOTHING
 RETURNING id;
 
+-- name: get_address_id^
+SELECT id FROM addresses WHERE network = :network AND address = :address;
+
 -- name: upsert_evm_properties!
 INSERT INTO evm_properties (address_id, native_balance, is_eoa, is_safe)
 VALUES (:address_id, :native_balance, :is_eoa, :is_safe)

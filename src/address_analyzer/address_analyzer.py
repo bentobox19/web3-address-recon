@@ -51,13 +51,12 @@ class AddressAnalyzer:
         address_id = await self.db_client.add_address(network, address, source)
         logger.info(f"Added address {network}:{address}. {address_id}")
 
-        # TODO
-        # Depending on the nature of the network that we will invoke this below
         is_safe = await self._process_evm_properties(address_id, network, address)
         if is_safe:
             await self._process_safe_details(address_id, network, address)
 
     async def _process_evm_properties(self, address_id: int, network: str, address: str) -> bool:
+        logger.debug(f"Request EVM properties for {address_id} - {network}:{address}")
         balance_task = self.rpc_client.get_native_balance(network, address)
         is_eoa_task = self.rpc_client.is_eoa(network, address)
         is_safe_task = self.rpc_client.is_safe(network, address)
@@ -71,13 +70,13 @@ class AddressAnalyzer:
             "is_eoa": is_eoa,
             "is_safe": is_safe,
         }
-        logger.info(f"EVM properties from {network}:{address}. {address_id}. {evm_props}")
+        logger.info(f"EVM properties from {address_id} - {network}:{address} - {evm_props}")
         await self.db_client.save_evm_properties(address_id, evm_props)
 
         return is_safe
 
     async def _process_safe_details(self, address_id: int, network: str, address: str):
-        logger.info(f"Address {network}:{address} is a Safe Wallet. Fetching details.")
+        logger.debug(f"Request safe details for {address_id} - {network}:{address}")
         threshold_task = self.rpc_client.get_safe_threshold(network, address)
         nonce_task = self.rpc_client.get_safe_nonce(network, address)
         owners_task = self.rpc_client.get_safe_owners(network, address)
@@ -92,4 +91,5 @@ class AddressAnalyzer:
             "nonce": nonce,
         }
 
+        logger.info(f"Safe details from {address_id} - {network}:{address} {safe_wallet_data}")
         await self.db_client.save_safe_wallet_data(address_id, owners, safe_wallet_data)
