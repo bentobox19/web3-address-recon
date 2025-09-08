@@ -50,8 +50,6 @@ class AddressAnalyzer:
     async def _analyze_address(self, network: str, address: str, source: str):
         address_id = await self.db_client.add_address(network, address, source)
 
-        logger.debug(f"obtenida address_id = {address_id}")
-
         # TODO
         # Depending on the nature of the network that we will invoke this below
         is_safe = await self._process_evm_properties(address_id, network, address)
