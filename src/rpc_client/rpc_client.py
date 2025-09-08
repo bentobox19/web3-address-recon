@@ -1,5 +1,4 @@
 import logging
-
 from functools import wraps
 
 from .alchemy_client import AlchemyClient
@@ -9,29 +8,24 @@ logger = logging.getLogger(__name__)
 
 def client_checker(func):
     @wraps(func)
-    def wrapper(self, *args, **kwargs):
+    async def wrapper(self, *args, **kwargs):
         network = args[0] if args else kwargs.get('network')
         if not network:
             logger.error("Network argument not found.")
             return None
 
-        if (client := self.client_map.get(network)):
+        client = self.client_map.get(network)
+        if client:
             new_args = (self, client) + args
-            return func(*new_args, **kwargs)
+            return await func(*new_args, **kwargs)
 
-        logger.warning(f"No RPC client configured for network: {network}")
-
-        if func.__name__ == 'get_native_balance':
-            return 0.0
-        elif func.__name__ == 'is_eoa':
-            return None
+        logger.warning("No RPC client configured for network: %s", network)
         return None
     return wrapper
 
 class RPCClient(RPCClientBase):
     def __init__(self):
         self.alchemy_client = AlchemyClient()
-
         self.client_map = {
             "arbitrum": self.alchemy_client,
             "avalanche": self.alchemy_client,
@@ -47,24 +41,24 @@ class RPCClient(RPCClientBase):
 
     @client_checker
     async def get_native_balance(self, client, network: str, address: str) -> float:
-        return client.get_native_balance(network, address)
+        return await client.get_native_balance(network, address)
 
     @client_checker
     async def is_eoa(self, client, network: str, address: str) -> bool | None:
-        return client.is_eoa(network, address)
+        return await client.is_eoa(network, address)
 
     @client_checker
     async def is_safe(self, client, network: str, address: str) -> bool | None:
-        return client.is_safe(network, address)
+        return await client.is_safe(network, address)
 
     @client_checker
     async def get_safe_threshold(self, client, network: str, address: str) -> int | None:
-        return client.get_safe_threshold(network, address)
+        return await client.get_safe_threshold(network, address)
 
     @client_checker
     async def get_safe_nonce(self, client, network: str, address: str) -> int | None:
-        return client.get_safe_nonce(network, address)
+        return await client.get_safe_nonce(network, address)
 
     @client_checker
     async def get_safe_owners(self, client, network: str, address: str) -> list[str] | None:
-        return client.get_safe_owners(network, address)
+        return await client.get_safe_owners(network, address)

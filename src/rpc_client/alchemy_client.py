@@ -1,4 +1,7 @@
 import logging
+import asyncio
+import httpx
+from aiolimiter import AsyncLimiter
 
 from src.config import config
 from .base import RPCClientBase
@@ -22,6 +25,18 @@ class AlchemyClient(RPCClientBase):
             "sei": f"https://sei-mainnet.g.alchemy.com/v2/{config.ALCHEMY_API_KEY}",
             "zksync": f"https://zksync-mainnet.g.alchemy.com/v2/{config.ALCHEMY_API_KEY}"
         }
+
+        # async HTTP client (reused, pooled connections)
+        self._http = httpx.AsyncClient(timeout=10, http2=True)
+
+        # async rate limit: adjust to match your Alchemy plan
+        self._alchemy_rate_limit = AsyncLimiter(250, 1)  # 250 req/sec
+
+        # bound in-flight concurrency to avoid overwhelming the loop/remote
+        self._alchemy_concurrency = asyncio.Semaphore(50)  # ~50 concurrent requests
+
+    async def aclose(self):
+        await self._http.aclose()
 
     @alchemy_request("eth_getBalance")
     def get_native_balance(self, network: str, address: str, result: str | None) -> str:
@@ -47,14 +62,13 @@ class AlchemyClient(RPCClientBase):
             return int(result, 16)
         return None
 
-    # Check for nonce() (method signature 0xaffed0e0)
+    # Check for getOwners(method signature 0xa0e67e2b)
     @alchemy_request("eth_call", params_builder=lambda addr: [{"to": addr, "data": "0xaffed0e0"}, "latest"])
     def get_safe_nonce(self, network: str, address: str, result: str | None) -> int | None:
         if result and result != '0x':
             return int(result, 16)
         return None
 
-    # Check for getOwners(method signature 0xa0e67e2b)
     @alchemy_request("eth_call", params_builder=lambda addr: [{"to": addr, "data": "0xa0e67e2b"}, "latest"])
     def get_safe_owners(self, network: str, address: str, result: str | None) -> list[str] | None:
         if result and result != '0x':

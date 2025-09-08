@@ -37,11 +37,15 @@ class AddressAnalyzer:
     async def _worker(self, name: str):
         while True:
             try:
-                network, address, source = await self.queue.get()
-                logger.info(f"[{name}] Processing: {network}:{address}")
-                await self._analyze_address(network, address, source)
+                # if cancelled here, no task_done
+                item = await self.queue.get()
             except asyncio.CancelledError:
                 break
+
+            try:
+                network, address, source = item
+                logger.info(f"[{name}] Processing: {network}:{address}")
+                await self._analyze_address(network, address, source)
             except Exception as e:
                 logger.error(f"Error in {name}: {e}", exc_info=True)
             finally:
