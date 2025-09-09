@@ -1,4 +1,4 @@
-# Web3 Address Recon
+# Web3 Address Reconnaissance Tool
 
 This tool written in python processes a list of Web3 addresses from a TXT file, fetches information using the Alchemy API, and stores the results in SQLite.
 
