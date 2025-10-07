@@ -148,6 +148,12 @@
                     </table>
                 </div>
             </section>
+
+            <section id="profile-section" class="bg-gray-800 p-6 rounded-lg shadow-lg mb-8 hidden">
+                <button id="back-button" class="mb-4 text-blue-400 hover:underline">&lt; Back</button>
+                <h2 id="profile-title" class="text-xl font-bold text-white mb-4">Address Profile</h2>
+                <div id="profile-content" class="space-y-2"></div>
+            </section>
         </main>
     </div>
 
@@ -173,6 +179,11 @@
         const addressesDescription = document.getElementById('addresses-description');
         const addressesThead = document.getElementById('addresses-thead');
         const allAddressesTableBody = document.getElementById('all-addresses-table-body');
+
+        const profileSection = document.getElementById('profile-section');
+        const backButton = document.getElementById('back-button');
+        const profileTitle = document.getElementById('profile-title');
+        const profileContent = document.getElementById('profile-content');
 
         const formatCurrency = (value) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
         const formatNumber = (value) => new Intl.NumberFormat('en-US').format(value);
@@ -215,8 +226,10 @@
 
         const hideError = () => errorMessage.classList.add('hidden');
 
+        let db = null;
         let allAddresses = [];
         let currentFilter = 'all';
+        let previousFilter = null;
 
         const setFilter = (filter) => {
             currentFilter = filter;
@@ -250,6 +263,12 @@
             ownerPortfoliosSection.classList.remove('hidden');
         });
 
+        backButton.addEventListener('click', () => {
+            profileSection.classList.add('hidden');
+            document.getElementById('key-stats').classList.remove('hidden');
+            setFilter(previousFilter);
+        });
+
         fileInput.addEventListener('change', async (event) => {
             const file = event.target.files[0];
             if (!file) return;
@@ -266,7 +285,7 @@
             const fileBuffer = await file.arrayBuffer();
 
             try {
-                const db = new SQL.Database(new Uint8Array(fileBuffer));
+                db = new SQL.Database(new Uint8Array(fileBuffer));
                 runAnalysis(db);
                 dashboardContent.classList.remove('hidden');
             } catch (err) {
@@ -276,6 +295,49 @@
                 loadingIndicator.classList.add('hidden');
             }
         });
+
+        function showProfile(addressData) {
+            profileTitle.textContent = `Profile for ${addressData.address}`;
+
+            let contentHtml = `
+                <p class="text-gray-300"><strong class="text-white">Address:</strong> ${addressData.address}</p>
+                <p class="text-gray-300"><strong class="text-white">Native Balance:</strong> ${weiToEth(addressData.balanceWei.toString()).toFixed(3)} ETH</p>
+                <p class="text-gray-300"><strong class="text-white">Market Value:</strong> ${formatCurrency(weiToEth(addressData.balanceWei.toString()) * ETH_PRICE_USD)}</p>
+                <p class="text-gray-300"><strong class="text-white">Type:</strong> ${addressData.isSafe ? 'SAFE Wallet' : (addressData.isEoa ? 'EOA' : 'Smart Contract')}</p>
+            `;
+
+            if (addressData.isSafe) {
+                contentHtml += `
+                    <p class="text-gray-300"><strong class="text-white">Threshold / Owners:</strong> ${addressData.threshold ?? 'N/A'} / ${addressData.ownerCount ?? 'N/A'}</p>
+                    <h3 class="text-lg font-bold text-white mt-4 mb-2">Owners:</h3>
+                    <ul class="list-disc pl-6 space-y-1">
+                `;
+
+                const ownersQuery = `
+                    SELECT owner_address
+                    FROM safe_wallet_owners
+                    WHERE safe_address_id = (SELECT id FROM addresses WHERE address = '${addressData.address}')
+                `;
+                const ownersResult = db.exec(ownersQuery);
+
+                if (ownersResult.length > 0 && ownersResult[0].values.length > 0) {
+                    ownersResult[0].values.forEach(([owner]) => {
+                        contentHtml += `<li><a href="https://etherscan.io/address/${owner}" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:underline">${owner}</a></li>`;
+                    });
+                } else {
+                    contentHtml += `<li class="text-gray-400">No owners found.</li>`;
+                }
+
+                contentHtml += `</ul>`;
+            }
+
+            profileContent.innerHTML = contentHtml;
+
+            document.getElementById('key-stats').classList.add('hidden');
+            allAddressesSection.classList.add('hidden');
+            ownerPortfoliosSection.classList.add('hidden');
+            profileSection.classList.remove('hidden');
+        }
 
         function populateAddressesTable(filter) {
             let filteredAddresses = allAddresses;
@@ -321,35 +383,71 @@
             } else if (filter === 'safe') {
                 theadHtml += `<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Threshold / Owners</th>`;
             }
+            theadHtml += `<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">View in Etherscan</th>`;
             theadHtml += `</tr>`;
             addressesThead.innerHTML = theadHtml;
 
             // Build tbody
             allAddressesTableBody.innerHTML = '';
             filteredAddresses.forEach(data => {
+                const row = document.createElement('tr');
+
+                // Address TD (clickable for profile)
+                const addressTd = document.createElement('td');
+                addressTd.className = 'px-6 py-4 whitespace-nowrap text-sm text-blue-400 font-mono cursor-pointer hover:underline';
+                addressTd.textContent = data.address;
+                addressTd.addEventListener('click', () => {
+                    previousFilter = filter;
+                    showProfile(data);
+                });
+                row.appendChild(addressTd);
+
+                // Native Balance TD
                 const ethValue = weiToEth(data.balanceWei.toString());
-                const usdValue = ethValue * ETH_PRICE_USD;
-                let rowHtml = `
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400 font-mono">
-                        <a href="https://etherscan.io/address/${data.address}" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:underline">${data.address}</a>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-white">${ethValue.toFixed(3)} ETH</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-white font-semibold">${formatCurrency(usdValue)}</td>
-                `;
+                const nativeTd = document.createElement('td');
+                nativeTd.className = 'px-6 py-4 whitespace-nowrap text-sm text-white';
+                nativeTd.textContent = `${ethValue.toFixed(3)} ETH`;
+                row.appendChild(nativeTd);
+
+                // Market Value TD
+                const marketTd = document.createElement('td');
+                marketTd.className = 'px-6 py-4 whitespace-nowrap text-sm text-white font-semibold';
+                marketTd.textContent = formatCurrency(ethValue * ETH_PRICE_USD);
+                row.appendChild(marketTd);
+
+                // Type-specific TD
                 if (filter === 'all') {
                     const addressType = data.isSafe ? 'SAFE Wallet' : (data.isEoa ? 'EOA' : 'Smart Contract');
-                    rowHtml += `<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">${addressType}</td>`;
+                    const typeTd = document.createElement('td');
+                    typeTd.className = 'px-6 py-4 whitespace-nowrap text-sm text-gray-400';
+                    typeTd.textContent = addressType;
+                    row.appendChild(typeTd);
                 } else if (filter === 'safe') {
                     const thresholdOwner = `${data.threshold ?? 'N/A'} / ${data.ownerCount ?? 'N/A'}`;
-                    rowHtml += `<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">${thresholdOwner}</td>`;
+                    const thresholdTd = document.createElement('td');
+                    thresholdTd.className = 'px-6 py-4 whitespace-nowrap text-sm text-gray-400';
+                    thresholdTd.textContent = thresholdOwner;
+                    row.appendChild(thresholdTd);
                 }
-                const row = document.createElement('tr');
-                row.innerHTML = rowHtml;
+
+                // Etherscan TD
+                const etherscanTd = document.createElement('td');
+                etherscanTd.className = 'px-6 py-4 whitespace-nowrap text-sm text-gray-400';
+                etherscanTd.innerHTML = `
+                    <a href="https://etherscan.io/address/${data.address}" target="_blank" rel="noopener noreferrer">
+                        <svg class="w-5 h-5 text-blue-400 hover:text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                        </svg>
+                    </a>
+                `;
+                row.appendChild(etherscanTd);
+
                 allAddressesTableBody.appendChild(row);
             });
         }
 
-        function runAnalysis(db) {
+        function runAnalysis(database) {
+            db = database;
             // 1. Calculate Total Funds
             const totalFundsQuery = "SELECT SUM(CAST(native_balance AS REAL)) FROM evm_properties";
             const totalFundsResult = db.exec(totalFundsQuery);
