@@ -39,6 +39,14 @@
             height: 100%;
             transition: width 0.5s ease-in-out;
         }
+        #breakdown-card:hover:not(:has(#eoa-breakdown:hover, #safe-breakdown:hover, #sc-breakdown:hover)) {
+            background-color: #374151; /* gray-700 */
+        }
+        #eoa-breakdown:hover,
+        #safe-breakdown:hover,
+        #sc-breakdown:hover {
+            background-color: #374151; /* gray-700 */
+        }
     </style>
 </head>
 <body class="text-gray-300">
@@ -73,10 +81,10 @@
                     <p class="text-sm text-gray-400 mt-1">Click to view all addresses</p>
                 </div>
 
-                <div id="breakdown-card" class="bg-gray-800 p-6 rounded-lg shadow-lg cursor-pointer hover:bg-gray-700 transition-colors">
+                <div id="breakdown-card" class="bg-gray-800 p-6 rounded-lg shadow-lg cursor-pointer transition-colors">
                     <h2 class="text-sm font-medium text-gray-400 uppercase mb-4">Address Breakdown</h2>
                     <div class="space-y-4">
-                        <div id="eoa-breakdown">
+                        <div id="eoa-breakdown" class="rounded-md transition-colors cursor-pointer">
                             <div class="flex justify-between items-baseline mb-1">
                                 <span class="text-sm text-gray-400 font-medium">EOA (<span id="eoa-count">0</span>)</span>
                                 <span class="text-sm text-white font-semibold" id="eoa-value">$0 (0.00%)</span>
@@ -85,7 +93,7 @@
                                 <div id="eoa-bar" class="progress-bar bg-blue-500" style="width: 0%;"></div>
                             </div>
                         </div>
-                        <div id="safe-breakdown">
+                        <div id="safe-breakdown" class="rounded-md transition-colors cursor-pointer">
                             <div class="flex justify-between items-baseline mb-1">
                                 <span class="text-sm text-gray-400 font-medium">SAFE (<span id="safe-count">0</span>)</span>
                                 <span class="text-sm text-white font-semibold" id="safe-value">$0 (0.00%)</span>
@@ -94,7 +102,7 @@
                                 <div id="safe-bar" class="progress-bar bg-green-500" style="width: 0%;"></div>
                             </div>
                         </div>
-                        <div id="sc-breakdown">
+                        <div id="sc-breakdown" class="rounded-md transition-colors cursor-pointer">
                              <div class="flex justify-between items-baseline mb-1">
                                 <span class="text-sm text-gray-400 font-medium">Smart Contracts (<span id="sc-count">0</span>)</span>
                                 <span class="text-sm text-white font-semibold" id="sc-value">$0 (0.00%)</span>
@@ -107,14 +115,14 @@
                 </div>
 
                 <div id="unique-owners-card" class="bg-gray-800 p-6 rounded-lg shadow-lg cursor-pointer hover:bg-gray-700 transition-colors hidden">
-                    <h2 class="text-sm font-medium text-gray-400 uppercase whitespace-nowrap">Total Safe Wallet Unique Owners</h2>
+                    <h2 class="text-sm font-medium text-gray-400 uppercase whitespace-nowrap">Total Unique Owners</h2>
                     <p id="unique-owners-count" class="text-3xl font-bold mt-2 text-white">0</p>
                     <p class="text-sm text-gray-400 mt-1">Click to view details</p>
                 </div>
             </section>
 
             <section id="owner-portfolios" class="bg-gray-800 p-6 rounded-lg shadow-lg mb-8 hidden">
-                <h2 class="text-xl font-bold text-white mb-4">Safe Wallet Owner Portfolios</h2>
+                <h2 class="text-xl font-bold text-white mb-4">Owner Portfolios</h2>
                 <p class="text-gray-400 mb-6">Unique owners and the cumulative value of the SAFE wallets they control.</p>
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-700">
