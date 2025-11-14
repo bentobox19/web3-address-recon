@@ -2,6 +2,8 @@
 
 This tool written in python processes a list of Web3 addresses from a TXT file, fetches information using the Alchemy API, and stores the results in SQLite.
 
+There is a port to Azure function at https://github.com/bentobox19/web3-address-recon-azure-fn
+
 <!-- MarkdownTOC -->
 
 - Requirements
