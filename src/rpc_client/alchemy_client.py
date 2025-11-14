@@ -50,7 +50,8 @@ class AlchemyClient(RPCClientBase):
             return result == '0x'
         return None
 
-    # Check for masterCopy() (method signature 0xa619486e), a good indicator of a Gnosis Safe proxy
+    # Check for masterCopy() (method signature 0xa619486e),
+    # a good indicator of a Gnosis Safe proxy
     @alchemy_request("eth_call", params_builder=lambda addr: [{"to": addr, "data": "0xa619486e"}, "latest"])
     def is_safe(self, network: str, address: str, result: str | None) -> bool | None:
         return result is not None and result != '0x'
@@ -62,13 +63,14 @@ class AlchemyClient(RPCClientBase):
             return int(result, 16)
         return None
 
-    # Check for getOwners(method signature 0xa0e67e2b)
+    # Check for nonce() (method signature 0xaffed0e0)
     @alchemy_request("eth_call", params_builder=lambda addr: [{"to": addr, "data": "0xaffed0e0"}, "latest"])
     def get_safe_nonce(self, network: str, address: str, result: str | None) -> int | None:
         if result and result != '0x':
             return int(result, 16)
         return None
 
+    # Check for getOwners(method signature 0xa0e67e2b)
     @alchemy_request("eth_call", params_builder=lambda addr: [{"to": addr, "data": "0xa0e67e2b"}, "latest"])
     def get_safe_owners(self, network: str, address: str, result: str | None) -> list[str] | None:
         if result and result != '0x':
