@@ -31,9 +31,9 @@ We are using [Alchemy](http://alchemy.com/):
 
 Copy `.env-sample` into `.env `. Replace with _your_ API Key.
 
-```bash
+````bash
 export ALCHEMY_API_KEY=9yUn7YrS814EkZ-2xI0Ex0VFHcPAUmRw
-```
+````
 
 ### Database Management
 
@@ -42,32 +42,32 @@ export ALCHEMY_API_KEY=9yUn7YrS814EkZ-2xI0Ex0VFHcPAUmRw
 
 Modify the location of this file at the `.env` file
 
-```bash
+````bash
 export SQLITE_DB_FILE=./db/web3-address-recon.sqlite3
-```
+````
 
 ### Dependencies
 
-```bash
+````bash
 # First time
 uv venv
 uv pip install -r requirements.txt
-```
+````
 
 ## Usage
 
-```bash
+````bash
 uv run python web3_address_recon.py -f $YOUR_TXT_WITH_WEB3_ADDRESSES
-```
+````
 
 ### Input Format
 
 TXT file with lines like:
 
-```
+````
 Ethereum 0x56e47B113E9n1cAfDne177n8c74c51DnB0F55553n62d8
 Polygon 0xa1eDedeF63bnef0ean2d2D0n71bnnDF88F715n43ec4fE
-```
+````
 
 ## Features
 
